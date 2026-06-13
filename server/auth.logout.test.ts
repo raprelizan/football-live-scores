@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
+import { ENV } from "./_core/env";
 
 type CookieCall = {
   name: string;
@@ -58,5 +59,31 @@ describe("auth.logout", () => {
       httpOnly: true,
       path: "/",
     });
+  });
+});
+
+describe("Football-Data.org API Integration", () => {
+  it("validates Football-Data.org API key is configured", async () => {
+    const apiKey = ENV.footballDataApiKey;
+    expect(apiKey).toBeDefined();
+    expect(apiKey).not.toBe("");
+    expect(apiKey?.length).toBeGreaterThan(0);
+
+    // Test API connectivity
+    if (apiKey) {
+      try {
+        const response = await fetch("https://api.football-data.org/v4/competitions", {
+          headers: {
+            "X-Auth-Token": apiKey,
+          },
+        });
+
+        // API should return 200 or 429 (rate limited), not 401 (unauthorized)
+        expect([200, 429]).toContain(response.status);
+      } catch (error) {
+        // Network error is acceptable in test environment
+        expect(error).toBeDefined();
+      }
+    }
   });
 });

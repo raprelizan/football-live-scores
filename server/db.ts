@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, and, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, matches, teams, competitions, standings, scorers, matchEvents } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,167 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Football-related queries
+export async function getMatchesForToday() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  try {
+    const result = await db
+      .select()
+      .from(matches)
+      .where(
+        and(
+          gte(matches.utcDate, today),
+          lte(matches.utcDate, tomorrow)
+        )
+      )
+      .orderBy(matches.utcDate);
+    return result;
+  } catch (error) {
+    console.error("Error fetching today's matches:", error);
+    return [];
+  }
+}
+
+export async function getLiveMatches() {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.status, "LIVE"))
+      .orderBy(matches.utcDate);
+    return result;
+  } catch (error) {
+    console.error("Error fetching live matches:", error);
+    return [];
+  }
+}
+
+export async function getMatchById(matchId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    const result = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.id, matchId))
+      .limit(1);
+    return result[0] || null;
+  } catch (error) {
+    console.error("Error fetching match:", error);
+    return null;
+  }
+}
+
+export async function getTeamById(teamId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    const result = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+    return result[0] || null;
+  } catch (error) {
+    console.error("Error fetching team:", error);
+    return null;
+  }
+}
+
+export async function getCompetitionById(competitionId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    const result = await db
+      .select()
+      .from(competitions)
+      .where(eq(competitions.id, competitionId))
+      .limit(1);
+    return result[0] || null;
+  } catch (error) {
+    console.error("Error fetching competition:", error);
+    return null;
+  }
+}
+
+export async function getStandingsByCompetition(competitionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(standings)
+      .where(eq(standings.competitionId, competitionId))
+      .orderBy(standings.position);
+    return result;
+  } catch (error) {
+    console.error("Error fetching standings:", error);
+    return [];
+  }
+}
+
+export async function getScorersByCompetition(competitionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(scorers)
+      .where(eq(scorers.competitionId, competitionId))
+      .orderBy(desc(scorers.goals))
+      .limit(20);
+    return result;
+  } catch (error) {
+    console.error("Error fetching scorers:", error);
+    return [];
+  }
+}
+
+export async function getMatchEvents(matchId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(matchEvents)
+      .where(eq(matchEvents.matchId, matchId))
+      .orderBy(matchEvents.minute);
+    return result;
+  } catch (error) {
+    console.error("Error fetching match events:", error);
+    return [];
+  }
+}
+
+export async function getMatchesByCompetition(competitionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.competitionId, competitionId))
+      .orderBy(desc(matches.utcDate));
+    return result;
+  } catch (error) {
+    console.error("Error fetching matches by competition:", error);
+    return [];
+  }
+}
