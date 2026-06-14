@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /.next/
+Disallow: /admin/
+
+# Specific rules for search engines
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Sitemap
+Sitemap: https://football-live-scores.manus.space/sitemap.xml
+
+# Crawl delay
+Crawl-delay: 1

@@ -12,6 +12,7 @@ import MatchDetail from "./pages/MatchDetail";
 import Competitions from "./pages/Competitions";
 import Standings from "./pages/Standings";
 import Scorers from "./pages/Scorers";
+import Search from "./pages/Search";
 
 function Router() {
   return (
@@ -21,6 +22,7 @@ function Router() {
       <Route path={"/competitions"} component={Competitions} />
       <Route path={"/standings"} component={Standings} />
       <Route path={"/scorers"} component={Scorers} />
+      <Route path={"/search"} component={Search} />
       <Route path={"/about"} component={About} />
       <Route path={"/contact"} component={Contact} />
       <Route path={"/privacy"} component={Privacy} />

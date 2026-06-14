@@ -14,6 +14,7 @@ export default function Header() {
     { label: AR.nav.competitions, href: "/competitions" },
     { label: AR.nav.standings, href: "/standings" },
     { label: AR.nav.scorers, href: "/scorers" },
+    { label: "البحث", href: "/search" },
     { label: AR.nav.about, href: "/about" },
     { label: AR.nav.contact, href: "/contact" },
   ];
