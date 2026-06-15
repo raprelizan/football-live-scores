@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import MatchCard from "@/components/MatchCard";
+import StructuredData from "@/components/StructuredData";
 import { trpc } from "@/lib/trpc";
 import { Spinner } from "@/components/ui/spinner";
 import { Card } from "@/components/ui/card";
@@ -69,6 +70,14 @@ export default function Home() {
 
   return (
     <Layout>
+      <StructuredData
+        type="Organization"
+        data={{
+          name: "كورة لايف",
+          description: "موقع متابعة مباريات كرة القدم المباشرة من أشهر البطولات العالمية",
+          url: "https://footballlive.app",
+        }}
+      />
       <div className="container py-8">
         {/* Header Section */}
         <div className="mb-8">

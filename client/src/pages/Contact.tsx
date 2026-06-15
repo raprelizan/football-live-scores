@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AR } from "@shared/translations";
 import { useState } from "react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ export default function Contact() {
     message: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const notifyOwnerMutation = trpc.system.notifyOwner.useMutation();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -28,8 +30,10 @@ export default function Contact() {
     setIsSubmitting(true);
 
     try {
-      // Simulate form submission
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await notifyOwnerMutation.mutateAsync({
+        title: `رسالة تواصل جديدة من ${formData.name}`,
+        content: `البريد الإلكتروني: ${formData.email}\n\nالرسالة:\n${formData.message}`,
+      });
       toast.success(AR.pages.contact.success);
       setFormData({ name: "", email: "", message: "" });
     } catch (error) {

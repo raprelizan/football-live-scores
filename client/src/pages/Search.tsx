@@ -9,11 +9,14 @@ import { mockTeams, mockMatches } from "@shared/mockData";
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { Search as SearchIcon, ChevronLeft } from "lucide-react";
+import LazyImage from "@/components/LazyImage";
 
 export default function Search() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCompetition, setSelectedCompetition] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const filteredResults = useMemo(() => {
     let results = {
@@ -56,9 +59,18 @@ export default function Search() {
       matchesFiltered = matchesFiltered.filter((m) => m.status === selectedStatus);
     }
 
+    if (startDate || endDate) {
+      matchesFiltered = matchesFiltered.filter((m) => {
+        const matchDate = new Date(m.utcDate);
+        if (startDate && matchDate < new Date(startDate)) return false;
+        if (endDate && matchDate > new Date(endDate)) return false;
+        return true;
+      });
+    }
+
     results.matches = matchesFiltered;
     return results;
-  }, [searchQuery, selectedCompetition, selectedStatus]);
+  }, [searchQuery, selectedCompetition, selectedStatus, startDate, endDate]);
 
   return (
     <Layout>
@@ -87,7 +99,7 @@ export default function Search() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">البطولة</label>
               <Select value={selectedCompetition} onValueChange={setSelectedCompetition}>
@@ -120,7 +132,39 @@ export default function Search() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">من التاريخ</label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">إلى التاريخ</label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
           </div>
+
+          {(startDate || endDate) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="mt-2 text-accent hover:text-accent/80"
+            >
+              مسح تصفية التاريخ
+            </Button>
+          )}
         </Card>
 
         {/* Results */}
@@ -134,14 +178,10 @@ export default function Search() {
                   <Card key={team.id} className="p-4 border-primary/50 hover:border-primary transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       {team.crest && (
-                        <img
+                        <LazyImage
                           src={team.crest}
                           alt={team.name}
                           className="w-12 h-12 object-contain"
-                          onError={(e) => {
-                            e.currentTarget.src =
-                              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23ddd'/%3E%3C/svg%3E";
-                          }}
                         />
                       )}
                       <div>
@@ -197,14 +237,10 @@ export default function Search() {
                                 <div className="flex items-center gap-2">
                                   <span className="font-semibold text-foreground">{homeTeam?.shortName}</span>
                                   {homeTeam?.crest && (
-                                    <img
+                                    <LazyImage
                                       src={homeTeam.crest}
                                       alt={homeTeam.name}
                                       className="w-6 h-6 object-contain"
-                                      onError={(e) => {
-                                        e.currentTarget.src =
-                                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23ddd'/%3E%3C/svg%3E";
-                                      }}
                                     />
                                   )}
                                 </div>
@@ -221,14 +257,10 @@ export default function Search() {
 
                                 <div className="flex items-center gap-2">
                                   {awayTeam?.crest && (
-                                    <img
+                                    <LazyImage
                                       src={awayTeam.crest}
                                       alt={awayTeam.name}
                                       className="w-6 h-6 object-contain"
-                                      onError={(e) => {
-                                        e.currentTarget.src =
-                                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23ddd'/%3E%3C/svg%3E";
-                                      }}
                                     />
                                   )}
                                   <span className="font-semibold text-foreground">{awayTeam?.shortName}</span>

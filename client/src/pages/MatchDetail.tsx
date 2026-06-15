@@ -17,12 +17,12 @@ export default function MatchDetail() {
 
   const { data: match, isLoading } = trpc.football.getMatchDetails.useQuery(
     { matchId },
-    { enabled: matchId > 0 }
+    { enabled: matchId > 0, refetchInterval: 60000 }
   );
 
   const { data: events = [] } = trpc.football.getMatchEvents.useQuery(
     { matchId },
-    { enabled: matchId > 0 }
+    { enabled: matchId > 0, refetchInterval: 60000 }
   );
 
   if (isLoading) {
