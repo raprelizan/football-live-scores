@@ -13,6 +13,8 @@ import Competitions from "./pages/Competitions";
 import Standings from "./pages/Standings";
 import Scorers from "./pages/Scorers";
 import Search from "./pages/Search";
+import LiveMatch from "./pages/LiveMatch";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function Router() {
   return (
@@ -23,6 +25,8 @@ function Router() {
       <Route path={"/standings"} component={Standings} />
       <Route path={"/scorers"} component={Scorers} />
       <Route path={"/search"} component={Search} />
+      <Route path={"/live/:matchId"} component={LiveMatch} />
+      <Route path={"/admin"} component={AdminDashboard} />
       <Route path={"/about"} component={About} />
       <Route path={"/contact"} component={Contact} />
       <Route path={"/privacy"} component={Privacy} />

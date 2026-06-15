@@ -178,3 +178,101 @@ export const apiUsage = mysqlTable("apiUsage", {
 
 export type ApiUsage = typeof apiUsage.$inferSelect;
 export type InsertApiUsage = typeof apiUsage.$inferInsert;
+
+// Live Streams table - لتخزين روابط البث المباشر
+export const liveStreams = mysqlTable("liveStreams", {
+  id: int("id").autoincrement().primaryKey(),
+  matchId: int("matchId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  streamUrl: text("streamUrl").notNull(),
+  streamType: varchar("streamType", { length: 50 }).notNull(),
+  quality: varchar("quality", { length: 50 }),
+  language: varchar("language", { length: 50 }),
+  isActive: boolean("isActive").default(true),
+  provider: varchar("provider", { length: 100 }),
+  startTime: timestamp("startTime"),
+  endTime: timestamp("endTime"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow(),
+});
+
+export type LiveStream = typeof liveStreams.$inferSelect;
+export type InsertLiveStream = typeof liveStreams.$inferInsert;
+
+// Advertisements table
+export const advertisements = mysqlTable("advertisements", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  adType: varchar("adType", { length: 50 }).notNull(),
+  adCode: text("adCode"),
+  position: varchar("position", { length: 50 }).notNull(),
+  pageType: varchar("pageType", { length: 100 }),
+  imageUrl: text("imageUrl"),
+  clickUrl: text("clickUrl"),
+  isActive: boolean("isActive").default(true),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  impressions: int("impressions").default(0),
+  clicks: int("clicks").default(0),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow(),
+});
+
+export type Advertisement = typeof advertisements.$inferSelect;
+export type InsertAdvertisement = typeof advertisements.$inferInsert;
+
+// Stream Quality Options table
+export const streamQualityOptions = mysqlTable("streamQualityOptions", {
+  id: int("id").autoincrement().primaryKey(),
+  streamId: int("streamId").notNull(),
+  quality: varchar("quality", { length: 50 }).notNull(),
+  bitrate: varchar("bitrate", { length: 50 }),
+  resolution: varchar("resolution", { length: 50 }),
+  url: text("url").notNull(),
+  isDefault: boolean("isDefault").default(false),
+  createdAt: timestamp("createdAt").defaultNow(),
+});
+
+export type StreamQualityOption = typeof streamQualityOptions.$inferSelect;
+export type InsertStreamQualityOption = typeof streamQualityOptions.$inferInsert;
+
+// Match Broadcast Settings table
+export const matchBroadcastSettings = mysqlTable("matchBroadcastSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  matchId: int("matchId").notNull(),
+  isBroadcasting: boolean("isBroadcasting").default(false),
+  broadcastStartTime: timestamp("broadcastStartTime"),
+  broadcastEndTime: timestamp("broadcastEndTime"),
+  primaryStreamId: int("primaryStreamId"),
+  showStats: boolean("showStats").default(true),
+  showCommentary: boolean("showCommentary").default(true),
+  enableChat: boolean("enableChat").default(false),
+  enableAds: boolean("enableAds").default(true),
+  adFrequency: int("adFrequency"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow(),
+});
+
+export type MatchBroadcastSetting = typeof matchBroadcastSettings.$inferSelect;
+export type InsertMatchBroadcastSetting = typeof matchBroadcastSettings.$inferInsert;
+
+// Admin Logs table
+export const adminLogs = mysqlTable("adminLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  adminId: int("adminId").notNull(),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entityType", { length: 50 }).notNull(),
+  entityId: int("entityId"),
+  changes: json("changes"),
+  ipAddress: varchar("ipAddress", { length: 50 }),
+  userAgent: text("userAgent"),
+  createdAt: timestamp("createdAt").defaultNow(),
+});
+
+export type AdminLog = typeof adminLogs.$inferSelect;
+export type InsertAdminLog = typeof adminLogs.$inferInsert;
