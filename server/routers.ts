@@ -1,13 +1,13 @@
-import { COOKIE_NAME } from "@shared/const";
-import { liveStreams, advertisements, matchBroadcastSettings, adminLogs } from "../drizzle/schema";
-import { eq, and } from "drizzle-orm";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
-import { z } from "zod";
-import * as db from "./db";
-import * as footballService from "./services/footballDataService";
-import { mockMatches } from "@shared/mockData";
+import { COOKIE_NAME } from '@shared/const';
+import { liveStreams, advertisements, matchBroadcastSettings, adminLogs } from '../drizzle/schema';
+import { eq, and } from 'drizzle-orm';
+import { getSessionCookieOptions } from './_core/cookies';
+import { systemRouter } from './_core/systemRouter';
+import { publicProcedure, router, adminProcedure, protectedProcedure } from './_core/trpc';
+import { z } from 'zod';
+import * as db from './db';
+import * as footballService from './services/footballDataService';
+import { mockMatches } from '@shared/mockData';
 
 export const appRouter = router({
   system: systemRouter,
@@ -30,7 +30,7 @@ export const appRouter = router({
 
     getLiveMatches: publicProcedure.query(async () => {
       const liveMatches = await db.getLiveMatches();
-      return liveMatches.length > 0 ? liveMatches : mockMatches.filter((m) => m.status === "LIVE");
+      return liveMatches.length > 0 ? liveMatches : mockMatches.filter((m) => m.status === 'LIVE');
     }),
 
     getMatchDetails: publicProcedure
@@ -106,50 +106,64 @@ export const appRouter = router({
     getByMatch: publicProcedure
       .input(z.object({ matchId: z.number() }))
       .query(async ({ input }) => {
+        const streams = await db.getLiveStreamsByMatch(input.matchId);
+        return streams.map(stream => ({
+          ...stream,
+          qualityOptions: [
+            { quality: '720p', url: stream.streamUrl, isDefault: true },
+            { quality: '1080p', url: stream.streamUrl },
+            { quality: '480p', url: stream.streamUrl },
+          ],
+        }));
+      }),
+
+    list: adminProcedure
+      .query(async () => {
         const db_instance = await db.getDb();
         if (!db_instance) return [];
         
         const streams = await db_instance
           .select()
-          .from(liveStreams)
-          .where(eq(liveStreams.matchId, input.matchId));
+          .from(liveStreams);
         
-        return streams.map(stream => ({
-          ...stream,
-          qualityOptions: [
-            { quality: "720p", url: stream.streamUrl, isDefault: true },
-            { quality: "1080p", url: stream.streamUrl },
-            { quality: "480p", url: stream.streamUrl },
-          ],
-        }));
+        return streams;
       }),
 
-    create: publicProcedure
+    create: adminProcedure
       .input(z.object({
         matchId: z.number(),
         title: z.string(),
         streamUrl: z.string(),
-        streamType: z.enum(["HLS", "M3U8", "DASH"]),
+        streamType: z.enum(['HLS', 'M3U8', 'DASH']),
         quality: z.string().optional(),
         language: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user?.role !== "admin") {
-          throw new Error("Only admins can create streams");
+        try {
+          const result = await db.createLiveStream({
+            ...input,
+            createdBy: ctx.user?.id,
+          });
+          
+          // Log action
+          await db.createAdminLog({
+            adminId: ctx.user?.id,
+            action: 'CREATE_STREAM',
+            entityType: 'liveStream',
+            entityId: null,
+            changes: input,
+            ipAddress: ctx.req.ip,
+            userAgent: ctx.req.get('user-agent'),
+          });
+          
+          return { success: true, result };
+        } catch (error) {
+          console.error('Error creating stream:', error);
+          throw new Error('Failed to create stream');
         }
-        
-        const db_instance = await db.getDb();
-        if (!db_instance) throw new Error("Database not available");
-        
-        const result = await db_instance.insert(liveStreams).values({
-          ...input,
-          createdBy: ctx.user.id,
-        });
-        
-        return result;
       }),
 
-    update: publicProcedure
+    update: adminProcedure
       .input(z.object({
         id: z.number(),
         title: z.string().optional(),
@@ -157,17 +171,50 @@ export const appRouter = router({
         isActive: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user?.role !== "admin") {
-          throw new Error("Only admins can update streams");
+        try {
+          const { id, ...updates } = input;
+          await db.updateLiveStream(id, updates);
+          
+          // Log action
+          await db.createAdminLog({
+            adminId: ctx.user?.id,
+            action: 'UPDATE_STREAM',
+            entityType: 'liveStream',
+            entityId: id,
+            changes: updates,
+            ipAddress: ctx.req.ip,
+            userAgent: ctx.req.get('user-agent'),
+          });
+          
+          return { success: true };
+        } catch (error) {
+          console.error('Error updating stream:', error);
+          throw new Error('Failed to update stream');
         }
-        
-        const db_instance = await db.getDb();
-        if (!db_instance) throw new Error("Database not available");
-        
-        const { id, ...updates } = input;
-        await db_instance.update(liveStreams).set(updates).where(eq(liveStreams.id, id));
-        
-        return { success: true };
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          await db.deleteLiveStream(input.id);
+          
+          // Log action
+          await db.createAdminLog({
+            adminId: ctx.user?.id,
+            action: 'DELETE_STREAM',
+            entityType: 'liveStream',
+            entityId: input.id,
+            changes: null,
+            ipAddress: ctx.req.ip,
+            userAgent: ctx.req.get('user-agent'),
+          });
+          
+          return { success: true };
+        } catch (error) {
+          console.error('Error deleting stream:', error);
+          throw new Error('Failed to delete stream');
+        }
       }),
   }),
 
@@ -175,48 +222,158 @@ export const appRouter = router({
     getByPosition: publicProcedure
       .input(z.object({ position: z.string(), pageType: z.string().optional() }))
       .query(async ({ input }) => {
+        return await db.getAdvertisementsByPosition(input.position);
+      }),
+
+    list: adminProcedure
+      .query(async () => {
         const db_instance = await db.getDb();
         if (!db_instance) return [];
         
         const ads = await db_instance
           .select()
-          .from(advertisements)
-          .where(
-            and(
-              eq(advertisements.position, input.position),
-              eq(advertisements.isActive, true)
-            )
-          );
+          .from(advertisements);
         
         return ads;
       }),
 
-    create: publicProcedure
+    create: adminProcedure
       .input(z.object({
         title: z.string(),
-        adType: z.enum(["GOOGLE_ADSENSE", "BANNER", "VIDEO", "NATIVE"]),
+        adType: z.enum(['GOOGLE_ADSENSE', 'BANNER', 'VIDEO', 'NATIVE']),
         adCode: z.string().optional(),
-        position: z.enum(["TOP", "SIDEBAR", "BOTTOM", "INLINE"]),
+        position: z.enum(['TOP', 'SIDEBAR', 'BOTTOM', 'INLINE']),
         pageType: z.string().optional(),
+        imageUrl: z.string().optional(),
+        clickUrl: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user?.role !== "admin") {
-          throw new Error("Only admins can create ads");
+        try {
+          const result = await db.createAdvertisement({
+            ...input,
+            createdBy: ctx.user?.id,
+          });
+          
+          // Log action
+          await db.createAdminLog({
+            adminId: ctx.user?.id,
+            action: 'CREATE_AD',
+            entityType: 'advertisement',
+            entityId: null,
+            changes: input,
+            ipAddress: ctx.req.ip,
+            userAgent: ctx.req.get('user-agent'),
+          });
+          
+          return { success: true, result };
+        } catch (error) {
+          console.error('Error creating ad:', error);
+          throw new Error('Failed to create advertisement');
         }
-        
-        const db_instance = await db.getDb();
-        if (!db_instance) throw new Error("Database not available");
-        
-        const result = await db_instance.insert(advertisements).values({
-          ...input,
-          createdBy: ctx.user.id,
-        });
-        
-        return result;
+      }),
+
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        adCode: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          const { id, ...updates } = input;
+          await db.updateAdvertisement(id, updates);
+          
+          // Log action
+          await db.createAdminLog({
+            adminId: ctx.user?.id,
+            action: 'UPDATE_AD',
+            entityType: 'advertisement',
+            entityId: id,
+            changes: updates,
+            ipAddress: ctx.req.ip,
+            userAgent: ctx.req.get('user-agent'),
+          });
+          
+          return { success: true };
+        } catch (error) {
+          console.error('Error updating ad:', error);
+          throw new Error('Failed to update advertisement');
+        }
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          await db.deleteAdvertisement(input.id);
+          
+          // Log action
+          await db.createAdminLog({
+            adminId: ctx.user?.id,
+            action: 'DELETE_AD',
+            entityType: 'advertisement',
+            entityId: input.id,
+            changes: null,
+            ipAddress: ctx.req.ip,
+            userAgent: ctx.req.get('user-agent'),
+          });
+          
+          return { success: true };
+        } catch (error) {
+          console.error('Error deleting ad:', error);
+          throw new Error('Failed to delete advertisement');
+        }
+      }),
+  }),
+
+  admin: router({
+    getLogs: adminProcedure
+      .input(z.object({ limit: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return await db.getAdminLogs(ctx.user?.id, input.limit || 100);
+      }),
+
+    getStats: adminProcedure
+      .query(async ({ ctx }) => {
+        try {
+          const db_instance = await db.getDb();
+          if (!db_instance) {
+            return {
+              activeStreams: 0,
+              activeAds: 0,
+              totalMatches: 0,
+              totalViews: 0,
+            };
+          }
+
+          const activeStreams = await db_instance
+            .select()
+            .from(liveStreams)
+            .where(eq(liveStreams.isActive, true));
+
+          const activeAds = await db_instance
+            .select()
+            .from(advertisements)
+            .where(eq(advertisements.isActive, true));
+
+          return {
+            activeStreams: activeStreams.length,
+            activeAds: activeAds.length,
+            totalMatches: 0,
+            totalViews: 0,
+          };
+        } catch (error) {
+          console.error('Error fetching admin stats:', error);
+          return {
+            activeStreams: 0,
+            activeAds: 0,
+            totalMatches: 0,
+            totalViews: 0,
+          };
+        }
       }),
   }),
 });
 
 export type AppRouter = typeof appRouter;
-
-

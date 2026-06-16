@@ -1,6 +1,6 @@
 import { eq, desc, and, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, matches, teams, competitions, standings, scorers, matchEvents } from "../drizzle/schema";
+import { InsertUser, users, matches, teams, competitions, standings, scorers, matchEvents, liveStreams, advertisements, adminLogs } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -16,6 +16,92 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+// User queries
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0] || null;
+  } catch (error) {
+    console.error("Error fetching user by ID:", error);
+    return null;
+  }
+}
+
+export async function getUserByUsername(username: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0] || null;
+  } catch (error) {
+    console.error("Error fetching user by username:", error);
+    return null;
+  }
+}
+
+export async function getUserByOpenId(openId: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+    return result[0] || undefined;
+  } catch (error) {
+    console.error("Error fetching user by openId:", error);
+    return undefined;
+  }
+}
+
+export async function createAdminUser(data: {
+  username: string;
+  passwordHash: string;
+  name: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    const openId = `admin_${data.username}_${Date.now()}`;
+    const result = await db.insert(users).values({
+      openId,
+      username: data.username,
+      passwordHash: data.passwordHash,
+      name: data.name,
+      email: null,
+      loginMethod: 'password',
+      role: 'admin',
+      isActive: true,
+      lastSignedIn: new Date(),
+    });
+
+    const createdUser = await db.select().from(users).where(eq(users.username, data.username)).limit(1);
+    return createdUser[0];
+  } catch (error) {
+    console.error("Error creating admin user:", error);
+    throw error;
+  }
+}
+
+export async function updateUserLastSignedIn(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, userId));
+    return true;
+  } catch (error) {
+    console.error("Error updating user last signed in:", error);
+    return false;
+  }
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -55,9 +141,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
@@ -75,18 +158,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
   }
-}
-
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
 }
 
 // Football-related queries
@@ -250,6 +321,155 @@ export async function getMatchesByCompetition(competitionId: number) {
     return result;
   } catch (error) {
     console.error("Error fetching matches by competition:", error);
+    return [];
+  }
+}
+
+// Live Streams queries
+export async function getLiveStreamsByMatch(matchId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(liveStreams)
+      .where(and(eq(liveStreams.matchId, matchId), eq(liveStreams.isActive, true)))
+      .orderBy(liveStreams.createdAt);
+    return result;
+  } catch (error) {
+    console.error("Error fetching live streams:", error);
+    return [];
+  }
+}
+
+export async function createLiveStream(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    const result = await db.insert(liveStreams).values(data);
+    return result;
+  } catch (error) {
+    console.error("Error creating live stream:", error);
+    throw error;
+  }
+}
+
+export async function updateLiveStream(id: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    await db.update(liveStreams).set(data).where(eq(liveStreams.id, id));
+    return true;
+  } catch (error) {
+    console.error("Error updating live stream:", error);
+    throw error;
+  }
+}
+
+export async function deleteLiveStream(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    await db.update(liveStreams).set({ isActive: false }).where(eq(liveStreams.id, id));
+    return true;
+  } catch (error) {
+    console.error("Error deleting live stream:", error);
+    throw error;
+  }
+}
+
+// Advertisements queries
+export async function getAdvertisementsByPosition(position: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(advertisements)
+      .where(and(eq(advertisements.position, position), eq(advertisements.isActive, true)))
+      .orderBy(advertisements.createdAt);
+    return result;
+  } catch (error) {
+    console.error("Error fetching advertisements:", error);
+    return [];
+  }
+}
+
+export async function createAdvertisement(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    const result = await db.insert(advertisements).values(data);
+    return result;
+  } catch (error) {
+    console.error("Error creating advertisement:", error);
+    throw error;
+  }
+}
+
+export async function updateAdvertisement(id: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    await db.update(advertisements).set(data).where(eq(advertisements.id, id));
+    return true;
+  } catch (error) {
+    console.error("Error updating advertisement:", error);
+    throw error;
+  }
+}
+
+export async function deleteAdvertisement(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    await db.update(advertisements).set({ isActive: false }).where(eq(advertisements.id, id));
+    return true;
+  } catch (error) {
+    console.error("Error deleting advertisement:", error);
+    throw error;
+  }
+}
+
+// Admin logs queries
+export async function createAdminLog(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    const result = await db.insert(adminLogs).values(data);
+    return result;
+  } catch (error) {
+    console.error("Error creating admin log:", error);
+    throw error;
+  }
+}
+
+export async function getAdminLogs(adminId?: number, limit: number = 100) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    let query = db.select().from(adminLogs);
+    
+    if (adminId) {
+      query = query.where(eq(adminLogs.adminId, adminId));
+    }
+    
+    const result = await query
+      .orderBy(desc(adminLogs.createdAt))
+      .limit(limit);
+    return result;
+  } catch (error) {
+    console.error("Error fetching admin logs:", error);
     return [];
   }
 }
