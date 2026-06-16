@@ -14,6 +14,7 @@ import Standings from "./pages/Standings";
 import Scorers from "./pages/Scorers";
 import Search from "./pages/Search";
 import LiveMatch from "./pages/LiveMatch";
+import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 
 function Router() {
@@ -26,6 +27,7 @@ function Router() {
       <Route path={"/scorers"} component={Scorers} />
       <Route path={"/search"} component={Search} />
       <Route path={"/live/:matchId"} component={LiveMatch} />
+      <Route path={"/admin/login"} component={AdminLogin} />
       <Route path={"/admin"} component={AdminDashboard} />
       <Route path={"/about"} component={About} />
       <Route path={"/contact"} component={Contact} />
